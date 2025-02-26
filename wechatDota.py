@@ -3,13 +3,15 @@ import plugins
 import requests
 from common.log import logger
 from config import conf
+from bridge.reply import Reply, ReplyType
+from bridge.context import ContextType
 from plugins import *
 @plugins.register(
     name="wechatDota",
     desc="基于OpenDota API的信息查询插件",
     version="1.0.0",
     author="flatfish99",
-    desire_priority=0
+    desire_priority=100
 )
 class wechatDota(Plugin):
     def __init__(self):
@@ -17,13 +19,15 @@ class wechatDota(Plugin):
         self.handlers[Event.ON_HANDLE_CONTEXT] = self.on_handle_context
         logger.info(f"[{__class__.__name__}] initialized")
 
+    def on_handle_context(self, e_context: plugins.EventContext):
+        pass
 
     def get_help_text(self, **kwargs):
         """获取插件帮助信息"""
         help_text = """dota2比赛信息获取
         指令：
-        1. 输入 $dota {match ID} 获取某场比赛信息
-        2. 输入 $dota {player ID} 获取某玩家信息
+        1. 输入 $dota 查看比赛 {match ID} 获取某场比赛信息
+        2. 输入 $dota 查看玩家 {player ID} 获取某玩家信息
         3. 输入 $dota 订阅 {player ID} 订阅某玩家战报
         4. 输入 $dota 取消订阅 {player ID} 取消订阅某玩家战报
         """
