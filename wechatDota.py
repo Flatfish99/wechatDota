@@ -19,15 +19,14 @@ class wechatDota(Plugin):
     def __init__(self):
         super().__init__()
         self.handlers[Event.ON_HANDLE_CONTEXT] = self.on_handle_context
-        try:
-            self.config = super().load_config()
-            if not self.config:
-                self.config = self._load_config_template()
-
-            logger.info(f"[{__class__.__name__}] initialized")
-        except Exception as e:
-            logger.error(f"[wechatDota]初始化异常：{e}")
-            raise "[wechatDota] init failed, ignore "
+        # try:
+        #     self.config = super().load_config()
+        #     if not self.config:
+        #         self.config = self._load_config_template()
+        logger.info(f"[{__class__.__name__}] initialized")
+        # except Exception as e:
+        #     logger.error(f"[wechatDota]初始化异常：{e}")
+        #     raise "[wechatDota] init failed, ignore "
 
     def on_handle_context(self, e_context: plugins.EventContext):
         if e_context["context"].type != ContextType.TEXT:
