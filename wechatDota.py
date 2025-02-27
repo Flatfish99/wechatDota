@@ -46,8 +46,8 @@ class wechatDota(Plugin):
         if command == "查看比赛":
             # 参数校验
             if not args_str:
-                reply.content = "❌ 缺少玩家ID参数"
-            if not args_str.isdigit():
+                reply.content = "❌ 缺少比赛ID参数"
+            elif not args_str.isdigit():
                 reply.contnet = "❌ 比赛ID必须为数字"
             else:
                 # 调用实际功能函数
@@ -64,7 +64,7 @@ class wechatDota(Plugin):
             else:
                 # player_data = fetch_player_stats(int(args_str))
                 # reply.content = format_player(player_data)
-                reply.content = f"玩家 {args_str} 数据功能开发中..."
+                reply.content = f"玩家数据功能开发中..."
 
             e_context["reply"] = reply
             e_context.action = EventAction.BREAK_PASS
