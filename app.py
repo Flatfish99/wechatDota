@@ -1,4 +1,4 @@
-from opendota import DotaAPI
+from .opendota.DotaAPI import DotaAPI
 from datetime import datetime
 import json
 class App():
@@ -162,6 +162,6 @@ class App():
         return formatted_string
 if __name__ == "__main__":
     app = App()
-    print(app.getRecentMatches("139663739"))
+    print(app.getRecentMatches("123"))
 
 

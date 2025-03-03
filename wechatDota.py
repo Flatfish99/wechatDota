@@ -22,13 +22,17 @@ DATABASE = "./data/matches.db"
     desc="基于OpenDota API的信息查询插件",
     version="1.0.0",
     author="flatfish99",
-    desire_priority=100
+    desire_priority=199
 )
 class wechatDota(Plugin):
     def __init__(self):
         super().__init__()
         self.handlers[Event.ON_HANDLE_CONTEXT] = self.on_handle_context
         self.gewechat_config = self._load_root_config()
+        self._init_database()
+        logger.info("数据库加载成功")
+        self.api = App()
+        logger.info("opendota api初始化成功")
         if self.gewechat_config:
             self.app_id = self.gewechat_config.get("gewechat_app_id")
             self.base_url = self.gewechat_config.get("gewechat_base_url")
@@ -44,7 +48,6 @@ class wechatDota(Plugin):
             logger.error(f"[myDota]初始化异常：{e}")
         logger.info(f"[{__class__.__name__}] initialized")
         self._init_database()
-        self.api = App()
 
     def _load_root_config(self):
         """加载根目录的 config.json 文件"""
@@ -175,7 +178,7 @@ class wechatDota(Plugin):
                 reply.contnet = "❌ 比赛ID必须为数字"
             else:
                 # 调用实际功能函数
-                reply.contnet = self.api.getPlayerInfo(args_str)
+                reply.content = self.api.getPlayerInfo(args_str)
                 #reply = get_match_info(match_id=int(args_str))
             e_context["reply"] = reply
             e_context.action = EventAction.BREAK_PASS
@@ -187,7 +190,7 @@ class wechatDota(Plugin):
                 reply.content = "❌ 玩家ID必须为数字"
             else:
 
-                reply.contnet = self.api.getPlayerInfo(args_str)
+                reply.content = self.api.getPlayerInfo(args_str)
 
             e_context["reply"] = reply
             e_context.action = EventAction.BREAK_PASS
