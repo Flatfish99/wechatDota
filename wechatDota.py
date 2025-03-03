@@ -11,6 +11,7 @@ from bridge.bridge import Bridge
 from plugins import *
 import schedule
 import time
+import threading
 from .app import App
 
 import sqlite3
@@ -33,6 +34,10 @@ class wechatDota(Plugin):
         logger.info("数据库加载成功")
         self.api = App()
         logger.info("opendota api初始化成功")
+        logger.info("当前线程数："+str(len(threading.enumerate())))
+        self.thread = threading.Thread(target=self.run_scheduler)
+        self.thread.daemon = True
+        self.thread.start()
         if self.gewechat_config:
             self.app_id = self.gewechat_config.get("gewechat_app_id")
             self.base_url = self.gewechat_config.get("gewechat_base_url")
@@ -43,12 +48,10 @@ class wechatDota(Plugin):
             self.config = super().load_config()
             if not self.config:
                 self.config = self._load_config_template()
-                self.towxid = self.config.get("towxid")
+            self.towxid = self.config.get("towxid")
         except Exception as e:
             logger.error(f"[myDota]初始化异常：{e}")
         logger.info(f"[{__class__.__name__}] initialized")
-        self._init_database()
-
     def _load_root_config(self):
         """加载根目录的 config.json 文件"""
         try:
@@ -96,7 +99,7 @@ class wechatDota(Plugin):
                 last_match_id = excluded.last_match_id
             """, (player_id, player_name, last_match_time, last_match_id))
             conn.commit()
-            print(f"玩家 {player_name} 的数据已更新。")
+            logger.info(f"玩家 {player_name} 的数据已更新。")
     def check_and_update_matches(self):
         with sqlite3.connect(DATABASE) as conn:
             cursor = conn.cursor()
@@ -109,7 +112,7 @@ class wechatDota(Plugin):
 
                 # 如果接口返回的时间晚于数据库中的时间
                 if recent_match_time > db_last_match_time:
-                    print(f"玩家 {player_name} 的比赛时间已更新: {recent_match_time}")
+                    logger.info(f"玩家 {player_name} 的比赛时间已更新: {recent_match_time}")
 
                     # 更新数据库中的比赛时间
                     self.update_player_match(player_id, player_name, recent_match_time, recent_match_id)
@@ -142,16 +145,18 @@ class wechatDota(Plugin):
         try:
             response = requests.post(url, headers=headers, json=data1)
             response.raise_for_status()
-            print(f"POST 请求成功: 玩家 {player_name}")
+            logger.info(f"POST 请求成功: 玩家 {player_name}")
             response = requests.post(url, headers=headers, json=data2)
             response.raise_for_status()
-            print(f"POST 请求成功: 玩家 {player_name}")
+            logger.info(f"POST 请求成功: 玩家 {player_name}")
         except requests.exceptions.RequestException as e:
-            print(f"POST 请求失败: {e}")
+            logger.info(f"POST 请求失败: {e}")
     def run_scheduler(self):
-        schedule.every(10).seconds.do(self.check_and_update_matches)  # 每 10 秒执行一次
+        logger.info("子线程启动成功")
+        schedule.every(20).minutes.do(self.check_and_update_matches)  # 每 10 秒执行一次
         while True:
             schedule.run_pending()
+            logger.info("扫描数据库...")
             time.sleep(1)
 
 
@@ -206,7 +211,7 @@ class wechatDota(Plugin):
                 try:
                     playerName = self.api.api.get_player(args_str)['profile']['personaname']
                     self.update_player_match(args_str, playerName, 0, 0)
-                    reply.content = "✅ 订阅成功"
+                    reply.content = f"✅ 成功订阅{playerName}的比赛信息"
                 except:
                     reply.content = "❌ 订阅失败"
             e_context["reply"] = reply
