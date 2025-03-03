@@ -30,27 +30,30 @@ class wechatDota(Plugin):
         super().__init__()
         self.handlers[Event.ON_HANDLE_CONTEXT] = self.on_handle_context
         self.gewechat_config = self._load_root_config()
+        self.data_dir = os.path.join(os.path.dirname(__file__), "data")
+        os.makedirs(self.data_dir, exist_ok=True)
+        self.matches_db_path = os.path.join(self.data_dir, "matches.db")
         self._init_database()
         logger.info("数据库加载成功")
         self.api = App()
         logger.info("opendota api初始化成功")
         logger.info("当前线程数："+str(len(threading.enumerate())))
-        self.thread = threading.Thread(target=self.run_scheduler)
-        self.thread.daemon = True
-        self.thread.start()
+        #self.thread = threading.Thread(target=self.run_scheduler)
+        #self.thread.daemon = True
+        #self.thread.start()
         if self.gewechat_config:
             self.app_id = self.gewechat_config.get("gewechat_app_id")
             self.base_url = self.gewechat_config.get("gewechat_base_url")
             self.token = self.gewechat_config.get("gewechat_token")
         else:
-            logger.error("[myDota] 无法加载根目录的 config.json 文件，GewechatClient 初始化失败")
+            logger.error("[wechatDota] 无法加载根目录的 config.json 文件，GewechatClient 初始化失败")
         try:
             self.config = super().load_config()
             if not self.config:
                 self.config = self._load_config_template()
             self.towxid = self.config.get("towxid")
         except Exception as e:
-            logger.error(f"[myDota]初始化异常：{e}")
+            logger.error(f"[wechatDota]初始化异常：{e}")
         logger.info(f"[{__class__.__name__}] initialized")
     def _load_root_config(self):
         """加载根目录的 config.json 文件"""
@@ -66,7 +69,7 @@ class wechatDota(Plugin):
             logger.error(f"[myDota] 加载根目录的 config.json 文件失败: {e}")
             return None
     def _init_database(self):
-        with sqlite3.connect(DATABASE) as conn:
+        with sqlite3.connect(self.matches_db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("""
                     CREATE TABLE IF NOT EXISTS player_matches (
@@ -88,7 +91,7 @@ class wechatDota(Plugin):
             matchId = 0
         return startTime, matchId
     def update_player_match(self, player_id, player_name, last_match_time, last_match_id):
-        with sqlite3.connect(DATABASE) as conn:
+        with sqlite3.connect(self.matches_db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("""
             INSERT INTO player_matches (player_id, player_name, last_match_time, last_match_id)
@@ -101,7 +104,8 @@ class wechatDota(Plugin):
             conn.commit()
             logger.info(f"玩家 {player_name} 的数据已更新。")
     def check_and_update_matches(self):
-        with sqlite3.connect(DATABASE) as conn:
+        logger.info("扫描数据库...")
+        with sqlite3.connect(self.matches_db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT player_id, player_name, last_match_time, last_match_id FROM player_matches")
             players = cursor.fetchall()
@@ -156,7 +160,6 @@ class wechatDota(Plugin):
         schedule.every(20).minutes.do(self.check_and_update_matches)  # 每 10 秒执行一次
         while True:
             schedule.run_pending()
-            logger.info("扫描数据库...")
             time.sleep(1)
 
 
@@ -224,7 +227,7 @@ class wechatDota(Plugin):
                 reply.content = "❌ 玩家ID必须为数字"
             else:
                 try:
-                    with sqlite3.connect(DATABASE) as conn:
+                    with sqlite3.connect(self.matches_db_path) as conn:
                         cursor = conn.cursor()
                         cursor.execute("""
                             DELETE FROM player_matches
