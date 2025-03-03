@@ -1,10 +1,16 @@
-from OpenDotaClient import *
+from opendota.OpenDotaClient import *
 import json
 import emoji
+import time
 
 class DotaAPI(OpenDotaClient):
     def __init__(self):
         super().__init__()
+        self._init_heroes_data()
+
+    def _init_heroes_data(self):
+        self.heroes_data = self._get("constants/heroes")
+
     def get_match_details(self, match_id):
         """获取比赛详情[1](@ref)"""
         return self._get(f"matches/{match_id}")
@@ -13,11 +19,15 @@ class DotaAPI(OpenDotaClient):
         """获取玩家最近比赛记录"""
         return self._get(f"players/{player_id}/recentMatches")
 
+    def get_player(self, player_id):
+        """获取玩家"""
+        return self._get(f"players/{player_id}")
+
     def get_hero_stats(self):
         """获取英雄统计数据"""
         return self._get("heroStats")
 
-    def search_players(self, name):
+    def search_players_by_name(self, name):
         """搜索玩家（需OpenDota高级权限）"""
         return self._get("search", params={"q": name})
 
@@ -34,9 +44,6 @@ if __name__ == "__main__":
     # matchidNeed = matchid
     # print(results)
 
-    res = api.get_player_recent_matches('127824480')
-    matchidNeed = res[0]['match_id']
-    id_hero = res[0]['hero_id']
-    h = requests.get('https://raw.githubusercontent.com/odota/dotaconstants/refs/heads/master/build/heroes.json')
-    hero = h.json()[str(id_hero)]["localized_name"]
-    print(hero, matchidNeed)
+    res = api.get_player('127824480')
+
+    print(res)
