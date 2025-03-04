@@ -26,35 +26,91 @@ DATABASE = "./data/matches.db"
     desire_priority=199
 )
 class wechatDota(Plugin):
+    _instance = None
+    _initialized = False
+    _scheduler = None
+    _scheduler_lock = threading.Lock()
+    _running = False
+    def __new__(cls):
+        if not cls._instance:
+            cls._instance = super().__new__(cls)
+        return cls._instance
     def __init__(self):
-        super().__init__()
-        self.handlers[Event.ON_HANDLE_CONTEXT] = self.on_handle_context
-        self.gewechat_config = self._load_root_config()
-        self.data_dir = os.path.join(os.path.dirname(__file__), "data")
-        os.makedirs(self.data_dir, exist_ok=True)
-        self.matches_db_path = os.path.join(self.data_dir, "matches.db")
-        self._init_database()
-        logger.info("数据库加载成功")
-        self.api = App()
-        logger.info("opendota api初始化成功")
-        logger.info("当前线程数："+str(len(threading.enumerate())))
-        #self.thread = threading.Thread(target=self.run_scheduler)
-        #self.thread.daemon = True
-        #self.thread.start()
-        if self.gewechat_config:
-            self.app_id = self.gewechat_config.get("gewechat_app_id")
-            self.base_url = self.gewechat_config.get("gewechat_base_url")
-            self.token = self.gewechat_config.get("gewechat_token")
-        else:
-            logger.error("[wechatDota] 无法加载根目录的 config.json 文件，GewechatClient 初始化失败")
+        #只初始化一次
+        if not self.__class__._initialized:
+            super().__init__()
+            self.handlers[Event.ON_HANDLE_CONTEXT] = self.on_handle_context
+            self.gewechat_config = self._load_root_config()
+            self.data_dir = os.path.join(os.path.dirname(__file__), "data")
+            os.makedirs(self.data_dir, exist_ok=True)
+            self.matches_db_path = os.path.join(self.data_dir, "matches.db")
+            self._init_database()
+            logger.info("数据库加载成功")
+            self.api = App()
+            logger.info("opendota api初始化成功")
+            logger.info("当前线程数："+str(len(threading.enumerate())))
+            if self.gewechat_config:
+                self.app_id = self.gewechat_config.get("gewechat_app_id")
+                self.base_url = self.gewechat_config.get("gewechat_base_url")
+                self.token = self.gewechat_config.get("gewechat_token")
+            else:
+                logger.error("[wechatDota] 无法加载根目录的 config.json 文件，GewechatClient 初始化失败")
+            try:
+                self.config = super().load_config()
+                if not self.config:
+                    self.config = self._load_config_template()
+                self.towxid = self.config.get("towxid")
+            except Exception as e:
+                logger.error(f"[wechatDota]初始化异常：{e}")
+            with self.__class__._scheduler_lock:
+                # 如果存在旧的调度器，先停止它
+                if self.__class__._scheduler and self.__class__._scheduler.is_alive():
+                    self._running = False  # 停止旧的循环
+                    self._scheduler.join(timeout=1)  # 等待旧线程结束
+
+                # 启动新的调度器
+                self.__class__._running = True
+                self.__class__._scheduler = threading.Thread(target=self.run_scheduler)
+                self.__class__._scheduler.daemon = True
+                self.__class__._scheduler.start()
+
+            logger.info(f"[{__class__.__name__}] initialized")
+            self.__class__._initialized = True
+    def reload(self):
+        """重载时停止旧线程，返回 (success, message)"""
         try:
-            self.config = super().load_config()
-            if not self.config:
-                self.config = self._load_config_template()
-            self.towxid = self.config.get("towxid")
+            with self.__class__._scheduler_lock:
+                # 停止旧线程
+                self.__class__._running = False
+                if self.__class__._scheduler and self.__class__._scheduler.is_alive():
+                    try:
+                        self.__class__._scheduler.join(timeout=1)
+                        if self.__class__._scheduler.is_alive():
+                            return False, "Failed to stop timer thread"
+                    except Exception as e:
+                        return False, f"Error stopping timer thread: {e}"
+
+                # 重新初始化 handlers
+                self.handlers[Event.ON_HANDLE_CONTEXT] = self.on_handle_context
+
+                # 重新初始化线程
+                self.__class__._running = True
+                self.__class__._scheduler = threading.Thread(target=self.run_scheduler)
+                self.__class__._scheduler.daemon = True
+                self.__class__._scheduler.start()
+
+                logger.info("[wechatDota] Plugin reloaded successfully")
+                return True, "Timer thread restarted successfully"
         except Exception as e:
-            logger.error(f"[wechatDota]初始化异常：{e}")
-        logger.info(f"[{__class__.__name__}] initialized")
+            logger.error(f"[wechatDota] Reload failed: {e}")
+            return False, f"Error reloading plugin: {e}"
+    def __del__(self):
+        """析构函数，确保线程正确退出"""
+        if hasattr(self, '_running'):
+            self.__class__._running = False
+        if hasattr(self, '_scheduler') and self._scheduler and self._scheduler.is_alive():
+            self.__class__._scheduler.join(timeout=1)
+            logger.info("[wechatDota] timer thread stopped")
     def _load_root_config(self):
         """加载根目录的 config.json 文件"""
         try:
@@ -158,7 +214,7 @@ class wechatDota(Plugin):
     def run_scheduler(self):
         logger.info("子线程启动成功")
         schedule.every(20).minutes.do(self.check_and_update_matches)  # 每 10 秒执行一次
-        while True:
+        while self.__class__._running:
             schedule.run_pending()
             time.sleep(1)
 
