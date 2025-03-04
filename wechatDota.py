@@ -18,6 +18,7 @@ import sqlite3
 
 DATABASE = "./data/matches.db"
 
+
 @plugins.register(
     name="wechatDota",
     desc="基于OpenDota API的信息查询插件",
@@ -31,12 +32,14 @@ class wechatDota(Plugin):
     _scheduler = None
     _scheduler_lock = threading.Lock()
     _running = False
+
     def __new__(cls):
         if not cls._instance:
             cls._instance = super().__new__(cls)
         return cls._instance
+
     def __init__(self):
-        #只初始化一次
+        # 只初始化一次
         if not self.__class__._initialized:
             super().__init__()
             self.handlers[Event.ON_HANDLE_CONTEXT] = self.on_handle_context
@@ -48,7 +51,7 @@ class wechatDota(Plugin):
             logger.info("数据库加载成功")
             self.api = App()
             logger.info("opendota api初始化成功")
-            logger.info("当前线程数："+str(len(threading.enumerate())))
+            logger.info("当前线程数：" + str(len(threading.enumerate())))
             if self.gewechat_config:
                 self.app_id = self.gewechat_config.get("gewechat_app_id")
                 self.base_url = self.gewechat_config.get("gewechat_base_url")
@@ -76,6 +79,7 @@ class wechatDota(Plugin):
 
             logger.info(f"[{__class__.__name__}] initialized")
             self.__class__._initialized = True
+
     def reload(self):
         """重载时停止旧线程，返回 (success, message)"""
         try:
@@ -104,6 +108,7 @@ class wechatDota(Plugin):
         except Exception as e:
             logger.error(f"[wechatDota] Reload failed: {e}")
             return False, f"Error reloading plugin: {e}"
+
     def __del__(self):
         """析构函数，确保线程正确退出"""
         if hasattr(self, '_running'):
@@ -111,6 +116,7 @@ class wechatDota(Plugin):
         if hasattr(self, '_scheduler') and self._scheduler and self._scheduler.is_alive():
             self.__class__._scheduler.join(timeout=1)
             logger.info("[wechatDota] timer thread stopped")
+
     def _load_root_config(self):
         """加载根目录的 config.json 文件"""
         try:
@@ -124,6 +130,7 @@ class wechatDota(Plugin):
         except Exception as e:
             logger.error(f"[myDota] 加载根目录的 config.json 文件失败: {e}")
             return None
+
     def _init_database(self):
         with sqlite3.connect(self.matches_db_path) as conn:
             cursor = conn.cursor()
@@ -137,6 +144,7 @@ class wechatDota(Plugin):
                 """)
             conn.commit()
             print("数据表已创建或已存在。")
+
     def get_recent_match(self, player_id):
         try:
             res = self.api.api.get_player_recent_matches(player_id)
@@ -146,6 +154,7 @@ class wechatDota(Plugin):
             startTime = 0
             matchId = 0
         return startTime, matchId
+
     def update_player_match(self, player_id, player_name, last_match_time, last_match_id):
         with sqlite3.connect(self.matches_db_path) as conn:
             cursor = conn.cursor()
@@ -159,6 +168,7 @@ class wechatDota(Plugin):
             """, (player_id, player_name, last_match_time, last_match_id))
             conn.commit()
             logger.info(f"玩家 {player_name} 的数据已更新。")
+
     def check_and_update_matches(self):
         logger.info("扫描数据库...")
         with sqlite3.connect(self.matches_db_path) as conn:
@@ -211,13 +221,13 @@ class wechatDota(Plugin):
             logger.info(f"POST 请求成功: 玩家 {player_name}")
         except requests.exceptions.RequestException as e:
             logger.info(f"POST 请求失败: {e}")
+
     def run_scheduler(self):
         logger.info("子线程启动成功")
         schedule.every(20).minutes.do(self.check_and_update_matches)  # 每 10 秒执行一次
         while self.__class__._running:
             schedule.run_pending()
             time.sleep(1)
-
 
     def on_handle_context(self, e_context: plugins.EventContext):
         if e_context["context"].type != ContextType.TEXT:
@@ -243,7 +253,7 @@ class wechatDota(Plugin):
             else:
                 # 调用实际功能函数
                 reply.content = self.api.getPlayerInfo(args_str)
-                #reply = get_match_info(match_id=int(args_str))
+                # reply = get_match_info(match_id=int(args_str))
             e_context["reply"] = reply
             e_context.action = EventAction.BREAK_PASS
             return
@@ -302,7 +312,6 @@ class wechatDota(Plugin):
             e_context["reply"] = reply
             e_context.action = EventAction.BREAK_PASS
             return
-
 
     def get_help_text(self, verbose=False, **kwargs):
         help_text = "dota2信息获取。"

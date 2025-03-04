@@ -1,4 +1,4 @@
-from opendota.OpenDotaClient import *
+from .OpenDotaClient import *
 import json
 import emoji
 import time
